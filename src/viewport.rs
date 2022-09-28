@@ -1,12 +1,21 @@
 use egui::{Context, FontDefinitions};
 use egui_winit_platform::{Platform, PlatformDescriptor};
-use winit::window::{Window, WindowId};
+use enum_dispatch::enum_dispatch;
+use winit::window::{Window};
 
 use crate::EventLoopState;
+use crate::control_panel::ControlPanel;
+use crate::display_window::DisplayWindow;
 
+#[enum_dispatch]
 pub trait Gui {
     fn draw(&mut self, ctx: &Context, state: EventLoopState);
-    fn notify_child_ui_has_closed(&mut self, window_id: WindowId);
+}
+
+#[enum_dispatch(Gui)]
+pub enum GuiImpl {
+    ControlPanel,
+    DisplayWindow
 }
 
 pub struct ViewportDesc {
@@ -19,7 +28,7 @@ pub struct Viewport {
     pub platform: Platform,
     pub window: Window,
     pub surface: wgpu::Surface,
-    pub gui: Box<dyn Gui>,
+    pub gui: GuiImpl,
 }
 
 impl ViewportDesc {
@@ -30,7 +39,7 @@ impl ViewportDesc {
 
     pub fn build<F>(self, adapter: &wgpu::Adapter, device: &wgpu::Device, gui_fn: F) -> Viewport
     where
-        F: FnOnce(&egui::Context) -> Box<dyn Gui>,
+        F: FnOnce(&egui::Context) -> GuiImpl,
     {
         let size = self.window.inner_size();
 

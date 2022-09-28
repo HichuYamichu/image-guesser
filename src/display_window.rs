@@ -1,31 +1,35 @@
-use egui::{style::Margin, Frame};
-use winit::window::WindowId;
+use egui::{style::Margin, Frame, TextureHandle};
 
-use crate::{my_image::MyImage, viewport::Gui, EventLoopState};
+use crate::{viewport::Gui, EventLoopState};
 
 pub struct DisplayWindow {
-    image: MyImage,
+    texture: TextureHandle,
     frame: Frame,
 }
 
 impl DisplayWindow {
-    pub fn new(image: MyImage) -> Self {
+    pub fn new(texture: TextureHandle) -> Self {
         let frame = Frame {
             inner_margin: Margin::same(0.0),
             ..Default::default()
         };
 
-        Self { image, frame  }
+        Self { texture, frame }
+    }
+}
+
+impl DisplayWindow {
+    pub fn update_texture(&mut self, tex: TextureHandle) {
+        self.texture = tex;
     }
 }
 
 impl Gui for DisplayWindow {
     fn draw(&mut self, ctx: &egui::Context, _state: EventLoopState) {
-        egui::CentralPanel::default().frame(self.frame).show(ctx, |ui| {
-            self.image.ui(ui);
-        });
-    }
-
-    fn notify_child_ui_has_closed(&mut self, _window_id: WindowId) {
+        egui::CentralPanel::default()
+            .frame(self.frame)
+            .show(ctx, |ui| {
+                ui.image(self.texture.id(), ui.available_size());
+            });
     }
 }

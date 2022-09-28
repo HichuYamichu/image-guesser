@@ -2,11 +2,10 @@ use std::collections::HashMap;
 use std::iter;
 use std::time::Instant;
 
+use egui::TextureHandle;
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
-use my_image::MyImage;
-use viewport::{Gui, Viewport, ViewportDesc};
+use viewport::{Gui, GuiImpl, Viewport, ViewportDesc};
 use wgpu::{Adapter, Device, Instance};
-use winit::dpi::PhysicalPosition;
 use winit::event::{ElementState, Event::*, KeyboardInput, VirtualKeyCode};
 use winit::event_loop::{EventLoopProxy, EventLoopWindowTarget};
 use winit::window::{Fullscreen, Window, WindowId};
@@ -22,6 +21,7 @@ const INITIAL_HEIGHT: u32 = 1080;
 pub enum MyEvent {
     OpenWindow(WindowId, Viewport),
     CloseWindow(WindowId),
+    UpdateChildWindowData(WindowId, TextureHandle),
 }
 
 fn main() {
@@ -50,9 +50,8 @@ fn main() {
     .expect("Failed to create device");
 
     let vp = main_vp_desc.build(&adapter, &device, |ctx| {
-        let img = MyImage::new(ctx);
-        let main_gui = control_panel::ControlPanel::new(img);
-        Box::new(main_gui)
+        let main_gui = control_panel::ControlPanel::new(ctx.clone());
+        GuiImpl::ControlPanel(main_gui)
     });
 
     let mut viewports: HashMap<WindowId, Viewport> = HashMap::new();
@@ -137,6 +136,17 @@ fn main() {
                 MyEvent::CloseWindow(window_id) => {
                     viewports.remove(&window_id);
                 }
+                MyEvent::UpdateChildWindowData(window_id, texture) => {
+                    let vp = viewports
+                        .get_mut(&window_id)
+                        .expect("This id must be present in map.");
+                    match &mut vp.gui {
+                        GuiImpl::ControlPanel(_) => {
+                            unreachable!("ControlPanel is never a child window.")
+                        }
+                        GuiImpl::DisplayWindow(ref mut dp) => dp.update_texture(texture),
+                    }
+                }
             },
             MainEventsCleared => {
                 viewports.iter().for_each(|(_, vp)| {
@@ -170,11 +180,13 @@ fn main() {
                             viewports.drain();
                             control_flow.set_exit();
                         } else {
-                            viewports
-                                .get_mut(&main_window_id)
-                                .unwrap()
-                                .gui
-                                .notify_child_ui_has_closed(window_id);
+                            let gui = &mut viewports.get_mut(&main_window_id).unwrap().gui;
+                            match gui {
+                                GuiImpl::ControlPanel(cp) => {
+                                    cp.notify_child_ui_has_closed(window_id);
+                                }
+                                GuiImpl::DisplayWindow(_) => unreachable!(),
+                            }
 
                             viewports.remove(&window_id);
                             if viewports.is_empty() {
@@ -230,7 +242,7 @@ impl<'a> EventLoopState<'a> {
         title: T,
         width: u32,
         height: u32,
-        gui: Box<dyn Gui>,
+        gui: GuiImpl,
     ) -> (WindowId, Viewport)
     where
         T: Into<String>,

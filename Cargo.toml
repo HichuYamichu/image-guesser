@@ -1,5 +1,5 @@
 [package]
-name = "t3"
+name = "image-guesser"
 version = "0.1.0"
 edition = "2021"
 
@@ -18,4 +18,3 @@ egui_extras = { version = "0.19", features = ["image"]}
 tinyfiledialogs = "3.0"
 enum_dispatch = "0.3.7"
 image = { version = "0.24", features = ["jpeg", "png"] }
-bus = "2.3.0"
